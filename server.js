@@ -1,49 +1,51 @@
-require('dotenv').config(); // Load environment variables from .env
-const express = require('express');
-const cors = require('cors');
+require('dotenv').config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+       const express = require('express');
+const cors = require("cors");
 const app = express();
-
-// Middleware
-app.use(cors());
+const bodyParser = require('body-parser');
+app.use(express.static('public'));
 app.use(express.json());
+app.use(cors());
+app.use(bodyParser.json());
+// const host = '192.168.1.117'; //system ip addr
+const host = '192.168.0.123'; //system ip addr
 
-// Endpoint for creating a payment sheet
 app.post('/payment-sheet', async (req, res) => {
     try {
-        const { name, email, amount, currency } = req.body;
+        const data = req.body;
+        console.log(req.body);
+        const params = {
+            name: data.name,
+            email: data.email
+        };
+        const customer = await stripe.customers.create(params);
+        console.log(customer.id);
 
-        // Create a new customer
-        const customer = await stripe.customers.create({ name, email });
-
-        // Create an ephemeral key
         const ephemeralKey = await stripe.ephemeralKeys.create(
             { customer: customer.id },
             { apiVersion: '2022-08-01' }
         );
 
-        // Create a payment intent
         const paymentIntent = await stripe.paymentIntents.create({
-            amount,
-            currency,
+            amount: data.amount,
+            currency: data.currency,
             customer: customer.id,
-            automatic_payment_methods: { enabled: true }
+            automatic_payment_methods: {
+                enabled: true
+            }
         });
-
-        // Respond with payment details
-        res.status(200).send({
+        const response = {
             paymentIntent: paymentIntent.client_secret,
             ephemeralKey: ephemeralKey.secret,
             customer: customer.id
-        });
-    } catch (error) {
-        console.error('Error processing payment:', error);
-        res.status(500).send({ error: 'Payment processing error' });
-    }
-});
+        }
 
-// Start the server
-const PORT = process.env.PORT || 7000; // Use environment variable or default to 7000
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+        res.status(200).send(response);
+
+    } catch (error) {
+        console.log(error)
+    }
+})
+
+app.listen(7000, '0.0.0.0', () => console.log('Running on port 7000'));
